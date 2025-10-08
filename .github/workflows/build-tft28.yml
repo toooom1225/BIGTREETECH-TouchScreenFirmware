@@ -1,0 +1,53 @@
+name: Build MKS TFT28 (V3_0 & V4_0)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ master, main ]
+    paths:
+      - 'TFT/**'
+      - 'platformio.ini'
+      - '.github/workflows/build-tft28.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        env_name: [ MKS_TFT28_V3_0, MKS_TFT28_V4_0 ]
+        prefer_tft: [ TFT28 ]
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: |
+          python -m pip install -U pip
+          python -m pip install -U platformio
+      - name: Verify env
+        run: |
+          if ! grep -q "^\[env:${{ matrix.env_name }}\]" platformio.ini; then
+            echo "::error::[env:${{ matrix.env_name }}] not found"; grep "^\[env:" platformio.ini || true; exit 1; fi
+      - name: Build (${{ matrix.env_name }})
+        run: python -m platformio run -e ${{ matrix.env_name }}
+      - name: Package
+        shell: bash
+        run: |
+          set -e
+          mkdir -p _dist/${{ matrix.env_name }}
+          BIN=$(find .pio/build -name "*.bin" -printf "%T@ %p\n" | sort -nr | head -n1 | cut -d' ' -f2-)
+          [ -z "$BIN" ] && { echo "::error::No BIN"; exit 1; }
+          cp "$BIN" "_dist/${{ matrix.env_name }}/MKSTFT28.bin"
+          for C in "Copy to SD Card root directory to update" "CopyToSD" "."; do
+            if [ -f "$C/config.ini" ] || ls "$C"/TFT* >/dev/null 2>&1; then ASSET="$C"; break; fi
+          done
+          [ -n "$ASSET" ] && { [ -f "$ASSET/config.ini" ] && cp "$ASSET/config.ini" "_dist/${{ matrix.env_name }}/";
+                               [ -d "$ASSET/${{ matrix.prefer_tft }}" ] && cp -r "$ASSET/${{ matrix.prefer_tft }}" "_dist/${{ matrix.env_name }}/" \
+                               || for D in "$ASSET"/TFT*; do [ -d "$D" ] && cp -r "$D" "_dist/${{ matrix.env_name }}/"; done; }
+          : > "_dist/${{ matrix.env_name }}/reset.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MKSTFT28_package_${{ matrix.env_name }}
+          path: _dist/${{ matrix.env_name }}/**
