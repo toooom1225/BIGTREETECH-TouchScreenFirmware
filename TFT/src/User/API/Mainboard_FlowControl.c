@@ -84,7 +84,7 @@ void loopBackEnd(void)
   // speed & flow monitor
   loopCheckSpeed();
 
-  if (infoMachineSettings.firmwareType != FW_REPRAPFW)
+  if (infoMachineSettings.firmwareType != FW_REPRAPFW || isPrintingFromTFT())
     loopCheckHeater();  // temperature monitor
   else
     rrfStatusQuery();  // query RRF status
