@@ -127,10 +127,13 @@ void rrfStatusQuery(void)
 
     rrf_next_query_time = OS_GetTimeMs() + rrf_query_interval;
 
-    // don't send status queries while in the terminal menu to avoid flooding the console
-    if (MENU_IS(menuTerminal))
+    // Don't send status queries while in the terminal menu to avoid flooding the console.
+    // Also avoid queueing M408 while a previous command is still pending or while the user is
+    // actively browsing print sources/files, as this is where RRF + TFT tends to desynchronise.
+    if (MENU_IS(menuTerminal) || infoHost.tx_count > 0 || MENU_IS(menuPrint) || MENU_IS(menuPrintFromSource))
       return;
 
     storeCmd("M408 S0\n");
   }
 }
+
