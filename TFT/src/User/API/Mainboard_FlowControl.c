@@ -68,12 +68,13 @@ void loopBackEnd(void)
     return;
 
   // handle ACK message timeout
-  if (InfoHost_HandleAckTimeout())  // if ACK message timeout, unlock any pending query waiting for an update
-  {
+if (InfoHost_HandleAckTimeout())  // if ACK message timeout, unlock any pending query waiting for an update
+{
+  if (infoMachineSettings.firmwareType != FW_REPRAPFW)
     addNotification(DIALOG_TYPE_ERROR, "ACK timed out", "Pending gcode released", true);
 
-    resetPendingQueries();
-  }
+  resetPendingQueries();
+}
 
   // handle heating timeout
   if (heatIsWaitingTimedout())
