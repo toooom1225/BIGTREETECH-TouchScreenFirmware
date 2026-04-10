@@ -8,13 +8,17 @@ HOST infoHost;
 MENU infoMenu;
 
 static bool InfoHost_HandleAckTimeout(void);  // forward declaration
-static bool InfoHost_Sstatic bool InfoHost_ShouldThrottleRRFQueries(void)
-{
-  return (infoMachineSettings.firmwareType == FW_REPRAPFW &&
-          (infoHost.tx_count > 0 ||
-           MENU_IS(menuPrint) ||
-           MENU_IS(menuPrintFromSource)));
-}houldThrottleRRFQueries(void);
+static bool InfoHost_S#include "Mainboard_FlowControl.h"
+#include "includes.h"
+#include "RRFStatusControl.h"
+
+CLOCKS mcuClocks;
+PRIORITY_COUNTER priorityCounter;
+HOST infoHost;
+MENU infoMenu;
+
+static bool InfoHost_HandleAckTimeout(void);  // forward declaration
+static bool InfoHost_ShouldThrottleRRFQueries(void);
 static uint8_t infoHost_ack_timeout_grace = 0;
 
 static inline void resetInfoQueries(void)
@@ -74,13 +78,13 @@ void loopBackEnd(void)
     return;
 
   // handle ACK message timeout
-if (InfoHost_HandleAckTimeout())  // if ACK message timeout, unlock any pending query waiting for an update
-{
-  if (infoMachineSettings.firmwareType != FW_REPRAPFW)
-    addNotification(DIALOG_TYPE_ERROR, "ACK timed out", "Pending gcode released", true);
+  if (InfoHost_HandleAckTimeout())  // if ACK message timeout, unlock any pending query waiting for an update
+  {
+    if (infoMachineSettings.firmwareType != FW_REPRAPFW)
+      addNotification(DIALOG_TYPE_ERROR, "ACK timed out", "Pending gcode released", true);
 
-  resetPendingQueries();
-}
+    resetPendingQueries();
+  }
 
   // handle heating timeout
   if (heatIsWaitingTimedout())
@@ -93,7 +97,7 @@ if (InfoHost_HandleAckTimeout())  // if ACK message timeout, unlock any pending 
     popupDialog(DIALOG_TYPE_ERROR, LABEL_TIMEOUT_REACHED, tempMsg, LABEL_CONFIRM, LABEL_RESUME, NULL, heatClearWaiting, NULL);
   }
 
-    if (!InfoHost_ShouldThrottleRRFQueries())
+  if (!InfoHost_ShouldThrottleRRFQueries())
   {
     // fan speed monitor
     loopCheckFan();
