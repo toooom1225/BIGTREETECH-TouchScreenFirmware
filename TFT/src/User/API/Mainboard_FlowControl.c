@@ -8,7 +8,13 @@ HOST infoHost;
 MENU infoMenu;
 
 static bool InfoHost_HandleAckTimeout(void);  // forward declaration
-static bool InfoHost_ShouldThrottleRRFQueries(void);
+static bool InfoHost_Sstatic bool InfoHost_ShouldThrottleRRFQueries(void)
+{
+  return (infoMachineSettings.firmwareType == FW_REPRAPFW &&
+          (infoHost.tx_count > 0 ||
+           MENU_IS(menuPrint) ||
+           MENU_IS(menuPrintFromSource)));
+}houldThrottleRRFQueries(void);
 static uint8_t infoHost_ack_timeout_grace = 0;
 
 static inline void resetInfoQueries(void)
@@ -87,16 +93,19 @@ if (InfoHost_HandleAckTimeout())  // if ACK message timeout, unlock any pending 
     popupDialog(DIALOG_TYPE_ERROR, LABEL_TIMEOUT_REACHED, tempMsg, LABEL_CONFIRM, LABEL_RESUME, NULL, heatClearWaiting, NULL);
   }
 
-  // fan speed monitor
-  loopCheckFan();
+    if (!InfoHost_ShouldThrottleRRFQueries())
+  {
+    // fan speed monitor
+    loopCheckFan();
 
-  // speed & flow monitor
-  loopCheckSpeed();
+    // speed & flow monitor
+    loopCheckSpeed();
 
-  if (infoMachineSettings.firmwareType != FW_REPRAPFW || isPrintingFromTFT() || InfoHost_ShouldThrottleRRFQueries())
-    loopCheckHeater();  // temperature monitor
-  else
-    rrfStatusQuery();  // query RRF status
+    if (infoMachineSettings.firmwareType != FW_REPRAPFW || isPrintingFromTFT())
+      loopCheckHeater();  // temperature monitor
+    else
+      rrfStatusQuery();   // query RRF status
+  }
 
   // handle a print from (remote) onboard media, if any
   if (infoMachineSettings.onboardSD == ENABLED)
