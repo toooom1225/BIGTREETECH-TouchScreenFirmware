@@ -8,6 +8,8 @@ HOST infoHost;
 MENU infoMenu;
 
 static bool InfoHost_HandleAckTimeout(void);  // forward declaration
+static bool InfoHost_ShouldThrottleRRFQueries(void);
+static uint8_t infoHost_ack_timeout_grace = 0;
 
 static inline void resetInfoQueries(void)
 {
@@ -30,6 +32,12 @@ void resetPendingQueries(void)
   #ifdef FIL_RUNOUT_PIN
     FIL_PosE_ClearSendingWaiting();      // clear sending waiting for position query
   #endif
+}
+
+static bool InfoHost_ShouldThrottleRRFQueries(void)
+{
+  return (infoMachineSettings.firmwareType == FW_REPRAPFW &&
+          (infoHost.tx_count > 0 || MENU_IS(menuPrint) || MENU_IS(menuPrintFromSource)));
 }
 
 // non-UI background loop tasks
@@ -84,7 +92,7 @@ void loopBackEnd(void)
   // speed & flow monitor
   loopCheckSpeed();
 
-  if (infoMachineSettings.firmwareType != FW_REPRAPFW || isPrintingFromTFT())
+  if (infoMachineSettings.firmwareType != FW_REPRAPFW || isPrintingFromTFT() || InfoHost_ShouldThrottleRRFQueries())
     loopCheckHeater();  // temperature monitor
   else
     rrfStatusQuery();  // query RRF status
@@ -137,7 +145,10 @@ void loopBackEnd(void)
 void loopFrontEnd(void)
 {
   // check if volume source (SD/USB) insert
-  loopVolumeSource();
+  // RRF is more stable if media/source polling is paused while the TFT still has pending
+  // commands or while the user is actively browsing the print sources menu.
+  if (!InfoHost_ShouldThrottleRRFQueries())
+    loopVolumeSource();
 
   // loop to check and run toast messages
   loopToast();
@@ -196,6 +207,16 @@ static bool InfoHost_HandleAckTimeout(void)
   if (OS_GetTimeMs() - infoHost.rx_timestamp < ACK_TIMEOUT || infoHost.tx_count == 0)  // if no timeout or no pending gcode
     return false;
 
+  // RRF can legitimately respond later while M408 polling, media browsing and UI commands
+  // overlap. Give it one extra timeout window before forcibly releasing the pending gcode.
+  if (infoMachineSettings.firmwareType == FW_REPRAPFW && infoHost_ack_timeout_grace == 0)
+  {
+    infoHost_ack_timeout_grace = 1;
+    infoHost.rx_timestamp = OS_GetTimeMs();
+    return false;
+  }
+
+  infoHost_ack_timeout_grace = 0;
   infoHost.rx_timestamp = infoHost.rx_ok_timestamp = OS_GetTimeMs();  // update timestamp
 
   InfoHost_HandleAckOk(HOST_SLOTS_GENERIC_OK);  // release pending gcode
@@ -211,6 +232,7 @@ void InfoHost_Init(bool isConnected)
   infoHost.tx_delay = infoSettings.tx_delay;
   infoHost.rx_timestamp = infoHost.rx_ok_timestamp = OS_GetTimeMs();
   infoHost.connected = isConnected;
+  infoHost_ack_timeout_grace = 0;
   infoHost.listening_mode = false;  // temporary disable listening mode. Its configured status will be restored later by InfoHost_UpdateListeningMode()
   infoHost.status = HOST_STATUS_IDLE;
 
@@ -257,6 +279,7 @@ bool InfoHost_IsCmdFromTFTSendable(void)
 void InfoHost_HandleAckOk(int16_t target_tx_slots)
 {
   infoHost.rx_ok_timestamp = OS_GetTimeMs();  // update timestamp
+  infoHost_ack_timeout_grace = 0;
 
   // the following check should always be matched unless:
   // - an ACK message not related to a gcode originated by the TFT is received
@@ -320,4 +343,5 @@ void InfoHost_HandleAckOk(int16_t target_tx_slots)
 void InfoHost_UpdateAckTimestamp(void)
 {
   infoHost.rx_timestamp = OS_GetTimeMs();  // update timestamp
+  infoHost_ack_timeout_grace = 0;
 }
