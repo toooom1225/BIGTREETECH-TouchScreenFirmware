@@ -8,16 +8,6 @@ HOST infoHost;
 MENU infoMenu;
 
 static bool InfoHost_HandleAckTimeout(void);  // forward declaration
-static bool InfoHost_S#include "Mainboard_FlowControl.h"
-#include "includes.h"
-#include "RRFStatusControl.h"
-
-CLOCKS mcuClocks;
-PRIORITY_COUNTER priorityCounter;
-HOST infoHost;
-MENU infoMenu;
-
-static bool InfoHost_HandleAckTimeout(void);  // forward declaration
 static bool InfoHost_ShouldThrottleRRFQueries(void);
 static uint8_t infoHost_ack_timeout_grace = 0;
 
