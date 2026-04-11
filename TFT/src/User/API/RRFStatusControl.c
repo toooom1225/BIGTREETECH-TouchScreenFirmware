@@ -136,4 +136,3 @@ void rrfStatusQuery(void)
     storeCmd("M408 S0\n");
   }
 }
-
